@@ -4,14 +4,18 @@
 # It also includes logging functions for better traceability.
 # Usage: ./start.mem0.sh <docker_image> <docker_container>
 # Author: tomagoyaky@gmail.com
-CURRENT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CURRENT="$(cd $(dirname $0); pwd)"
 #################################################
-docker_image=$1
-docker_container=$2
+export docker_image=$1
+export docker_container=$2
+export docker_host_workspace=$3
+export docker_container_workspace=$4
 
 print_parameters() {
     log_info "Docker Image: $docker_image"
     log_info "Docker Container: $docker_container"
+    log_info "Docker Host Workspace: $docker_host_workspace"
+    log_info "Docker Container Workspace: $docker_container_workspace"
 }
 usage() {
     log_error "Usage: $0 <docker_image> <docker_container>"
@@ -103,14 +107,41 @@ docker_run() {
     fi
 
     log_info "Running Docker container '$_container_name' from image '$_image_name'..."
-    if docker run --name "$_container_name" "$_image_name"; then
+set -x
+    docker run --name "$_container_name" \
+        -v "$docker_host_workspace:$docker_container_workspace" \
+        "$_image_name" \
+        /bin/bash -c "while true; do sleep 30; done" &
+set +x
+    if [ $? -eq 0 ]; then
         log_info "Successfully started Docker container '$_container_name'."
     else
         log_error "Failed to start Docker container '$_container_name'."
         exit 1
     fi
 }
-docker_bash() {
+docker_copy() {
+    _source_path=$1
+    _destination_path=$2
+    _container_name=$3
+
+    if [ -z "$_source_path" ] || [ -z "$_destination_path" ] || [ -z "$_container_name" ]; then
+        log_error "Source path, destination path, and container name must be provided."
+        usage
+    fi
+
+    log_info "Copying files from '$_source_path' to '$_container_name:$_destination_path'..."
+set -x
+    docker cp "$_source_path" "$_container_name:$_destination_path"
+set +x
+    if [ $? -eq 0 ]; then
+        log_info "Successfully copied files to Docker container '$_container_name'."
+    else
+        log_error "Failed to copy '$_source_path' to '$_destination_path' on Docker container '$_container_name'."
+        exit 1
+    fi
+}
+docker_shell() {
     _container_name=$1
 
     if [ -z "$_container_name" ]; then
@@ -126,3 +157,56 @@ docker_bash() {
         exit 1
     fi
 }
+docker_shell_cmd() {
+    _container_name=$1
+    _command=$2
+
+    if [ -z "$_container_name" ] || [ -z "$_command" ]; then
+        log_error "Container name and command must be provided."
+        usage
+    fi
+
+    log_info "Executing command: '$_command'"
+    docker exec "$_container_name" bash -c "$_command"
+    if [ $? -ne 0 ]; then
+        log_error "Failed to execute command '$_command' in Docker container '$_container_name'."
+        exit 1
+    fi
+}
+docker_is_installed() {
+    if command -v docker >/dev/null 2>&1; then
+        log_info "Docker is installed."
+    else
+        log_error "Docker is not installed. Please install Docker first."
+        exit 1
+    fi
+}
+docker_is_running() {
+    log_info "Checking if Docker is running..."
+    if [ $OSTYPE == "linux-gnu" ]; then
+        if systemctl is-active --quiet docker; then
+            log_info "Docker is running."
+        else
+            log_error "Docker is not running. Please start Docker first."
+            exit 1
+        fi
+    elif [ $OSTYPE == "darwin"* ]; then
+        if pgrep -x "Docker" >/dev/null; then
+            log_info "Docker is running."
+        else
+            log_error "Docker is not running. Please start Docker first."
+            exit 1
+        fi
+    elif [[ "$OSTYPE" == cygwin* ]] || [[ "$OSTYPE" == msys* ]] || [[ "$OSTYPE" == win32* ]]; then
+        if docker info >/dev/null 2>&1; then
+            log_info "Docker is running."
+        else
+            log_error "Docker is not running. Please start Docker Desktop first."
+            exit 1
+        fi
+    else
+        log_error "Unsupported OS type: $OSTYPE"
+        exit 1
+    fi
+}
+docker_is_running

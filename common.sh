@@ -3,16 +3,16 @@
 # It provides functions to list, remove, pull images, run containers, and check their states
 # Author: tomagoayky@gmail.com
 shell_name=$1
-CURRENT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DIR_WORKSPACE="$CURRENT/workspace"
-DIR_STATUS="$DIR_WORKSPACE/$shell_name/status"
-DIR_LOG="$DIR_WORKSPACE/$shell_name/logs"
-DIR_DATA="$DIR_WORKSPACE/$shell_name/data"
-DIR_SOURCES="$DIR_WORKSPACE/$shell_name/sources"
-DIR_UPLOAD="$DIR_WORKSPACE/$shell_name/input"
-DIR_OUTPUT="$DIR_WORKSPACE/$shell_name/output"
-DIR_TARS="$DIR_WORKSPACE/$shell_name/tars"
-DIR_TEMP="$DIR_WORKSPACE/$shell_name/tmp"
+CURRENT="$(cd $(dirname $0); pwd)"
+export DIR_WORKSPACE="$CURRENT/workspace"
+export DIR_STATUS="$DIR_WORKSPACE/$shell_name/status"
+export DIR_LOG="$DIR_WORKSPACE/$shell_name/logs"
+export DIR_DATA="$DIR_WORKSPACE/$shell_name/data"
+export DIR_SOURCES="$DIR_WORKSPACE/$shell_name/sources"
+export DIR_UPLOAD="$DIR_WORKSPACE/$shell_name/input"
+export DIR_OUTPUT="$DIR_WORKSPACE/$shell_name/output"
+export DIR_TARS="$DIR_WORKSPACE/$shell_name/tars"
+export DIR_TEMP="$DIR_WORKSPACE/$shell_name/tmp"
 
 log_info() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] INFO: $1"
@@ -28,7 +28,12 @@ log_debug() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] DEBUG: $1"
 }
 exist() {
-    command -v "$1" >/dev/null 2>&1
+    if [ command -v "$1" >/dev/null 2>&1 ]; then
+        log_info "Command '$1' exists."
+    else
+        log_error "Command '$1' does not exist."
+        exit 1
+    fi
 }
 mkdir_if_not_exists() {
     if [ ! -d "$1" ]; then
