@@ -24,21 +24,66 @@ workspace/               # 工作区目录
     tmp/                  # 临时文件目录
 ```
 
+
 ## 使用方法
 
-1. 克隆本仓库到本地：
-   ```bash
-   git clone https://github.com/tomagoyaky/shell-common.git
-   ```
-2. 进入项目目录，根据实际需求修改和使用各类脚本。
-3. 运行示例：
-   ```bash
-   bash start.mem0.sh
-   ```
+### 1. 克隆本仓库到本地
+```bash
+git clone https://github.com/tomagoyaky/shell-common.git
+```
+
+### 2. 进入项目目录，根据实际需求修改和使用各类脚本
+
+### 3. 使用 `start.sh` 快速初始化新项目
+
+#### 脚本参数说明
+
+| 参数 | 说明 |
+| ---- | ---- |
+| your_project_name | 项目名称（如 demo、mem0、agent 等）|
+| -p   | 启用 Python 支持（可选）|
+| -d   | 启用 Docker 支持（可选）|
+
+#### 用法示例
+
+```bash
+# 初始化一个名为 demo 的项目
+bash start.sh demo
+
+# 初始化并启用 Python 支持
+bash start.sh demo -p
+
+# 初始化并启用 Docker 支持
+bash start.sh demo -d
+
+# 同时启用 Python 和 Docker 支持
+bash start.sh demo -p -d
+```
+
+#### 交互式输入
+如未指定参数，脚本会提示输入项目名、镜像名、容器名、工作区路径等。
+
+#### 初始化流程
+1. 自动创建项目目录及 workspace 目录结构
+2. 自动复制模板文件（container.template、start.template）到新项目目录
+3. 自动生成启动脚本（如 start.demo.sh），并替换模板变量
+4. 根据参数自动加载 Python/Docker 支持脚本
+
+#### 多项目支持
+可在 `projects/` 下管理多个子项目，每个项目拥有独立的启动脚本和 workspace 目录。
+
+### 4. 运行项目
+进入对应项目目录，执行生成的启动脚本：
+```bash
+cd projects/demo
+./start.demo.sh
+```
+
 
 ## 依赖环境
-- Bash shell 环境（推荐在 Linux 或 WSL 下使用）
+- Bash shell 环境（推荐在 Linux、WSL 或 macOS 下使用，Windows 需安装 bash）
 - Python（如需运行 python.common.sh 相关脚本）
+
 
 ## 贡献说明
 欢迎提交 issue 或 pull request 以完善本项目。
