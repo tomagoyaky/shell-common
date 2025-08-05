@@ -54,20 +54,3 @@ setup_filesystem() {
     mkdir_if_not_exists "$DIR_TARS"
     mkdir_if_not_exists "$DIR_TEMP"
 }
-
-step0() {
-    log_info "Step 0: Initializing workspace directories..."
-    if [ ! -f $DIR_STATUS/filesystem.ok.status ]; then
-        log_info "Setting up filesystem..."
-        setup_filesystem
-        touch $DIR_STATUS/filesystem.ok.status
-        log_info "Filesystem setup complete."
-    else
-        log_info "Filesystem already set up."
-    fi
-}
-
-#################################################
-# default call step0 to initialize the filesystem
-#################################################
-step0
