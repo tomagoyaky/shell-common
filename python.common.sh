@@ -1,37 +1,38 @@
 #!/bin/bash
 # desc: 
 # Author: tomagoyaky@gmail.com
-CURRENT="$(cd $(dirname $0); pwd)"
+dir_workspace=$1
+dir_status="$dir_workspace/status"
 #################################################
-export DIR_VENV="$DIR_WORKSPACE/.venv"
+export dir_venv="$dir_workspace/.venv"
 #################################################
 
 venv_setup() {
     log_info "Setting up Python virtual environment..."
-    if [ ! -d "$DIR_VENV" ]; then
-        python3 -m venv "$DIR_VENV"
-        log_info "Virtual environment created at $DIR_VENV."
+    if [ ! -d "$dir_venv" ]; then
+        python3 -m venv "$dir_venv"
+        log_info "Virtual environment created at $dir_venv."
     else
-        log_info "Virtual environment already exists at $DIR_VENV."
+        log_info "Virtual environment already exists at $dir_venv."
     fi
 }
 activate_venv() {
-    if [ -d "$DIR_VENV" ]; then
+    if [ -d "$dir_venv" ]; then
         # For Unix/Linux compatibility
-        if [ -f $DIR_VENV/bin/activate ];then
+        if [ -f $dir_venv/bin/activate ];then
             log_info "Activating virtual environment for Unix/Linux..."
-            source "$DIR_VENV/bin/activate"
-            log_info "Activated virtual environment at $DIR_VENV."
-        elif [ -f "$DIR_VENV/Scripts/activate" ]; then
+            source "$dir_venv/bin/activate"
+            log_info "Activated virtual environment at $dir_venv."
+        elif [ -f "$dir_venv/Scripts/activate" ]; then
             log_info "Activating virtual environment for Windows..."
-            source "$DIR_VENV/Scripts/activate"
-            log_info "Activated virtual environment at $DIR_VENV."
+            source "$dir_venv/Scripts/activate"
+            log_info "Activated virtual environment at $dir_venv."
         else
             log_error "Python executable not found in virtual environment."
             exit 1
         fi
     else
-        log_error "Virtual environment not found at $DIR_VENV.   Please run venv_setup first."
+        log_error "Virtual environment not found at $dir_venv.   Please run venv_setup first."
         exit 1
     fi
 }
@@ -39,9 +40,9 @@ activate_venv() {
 #################################################
 # Check if virtual environment is set up and activate it
 #################################################
-if [ ! -f "$DIR_STATUS/venv.ok.status" ]; then
+if [ ! -f "$dir_status/venv.ok.status" ]; then
     venv_setup
-    touch "$DIR_STATUS/venv.ok.status"
+    touch "$dir_status/venv.ok.status"
     log_info "Virtual environment setup complete."
 else
     log_info "Virtual environment already set up."

@@ -1,6 +1,10 @@
 #!/bin/bash
 clear
-CURRENT="$(cd $(dirname $0); pwd)"
+DIR_ROOT="$(cd $(dirname $0); pwd)"
+# if DIR_ROOT contain '/cygdrive/d/' or '/cygdrive/c/' then replace it with 'D:/' or 'C:/'
+DIR_ROOT=$(echo "$DIR_ROOT" | sed -e 's|/cygdrive/d/|D:/|' -e 's|/cygdrive/c/|C:/|')
+export DIR_ROOT="$DIR_ROOT"
+
 #################################################
 if [ -z "$1" ]; then
     project_name="demo"
@@ -10,12 +14,39 @@ fi
 
 image_name="ubuntu:24.04"
 container_name="${project_name}-${image_name}"
-host_workspace="$CURRENT/workspace/$project_name"
+host_workspace="$DIR_ROOT/workspace/$project_name"
 container_workspace="/local/data/workspace/$project_name"
 
-DIR_PROJECT="$CURRENT/projects"
 #################################################
+export DIR_PROJECT="$DIR_ROOT/projects"
+export DIR_WORKSPACE="$DIR_ROOT/workspace"
+export DIR_STATUS="$DIR_WORKSPACE/$project_name/status"
+export DIR_LOG="$DIR_WORKSPACE/$project_name/logs"
+export DIR_DATA="$DIR_WORKSPACE/$project_name/data"
+export DIR_SOURCES="$DIR_WORKSPACE/$project_name/sources"
+export DIR_UPLOAD="$DIR_WORKSPACE/$project_name/input"
+export DIR_OUTPUT="$DIR_WORKSPACE/$project_name/output"
+export DIR_TARS="$DIR_WORKSPACE/$project_name/tars"
+export DIR_TEMP="$DIR_WORKSPACE/$project_name/tmp"
+mkdir_if_not_exists() {
+    if [ ! -d "$1" ]; then
+        mkdir -p "$1"
+        log_info "Created directory: $1"
+    else
+        log_info "Directory already exists: $1"
+    fi
+}
 
+setup_filesystem() {
+    mkdir_if_not_exists "$DIR_STATUS"
+    mkdir_if_not_exists "$DIR_LOG"
+    mkdir_if_not_exists "$DIR_DATA"
+    mkdir_if_not_exists "$DIR_SOURCES"
+    mkdir_if_not_exists "$DIR_UPLOAD"
+    mkdir_if_not_exists "$DIR_OUTPUT"
+    mkdir_if_not_exists "$DIR_TARS"
+    mkdir_if_not_exists "$DIR_TEMP"
+}
 usage() {
     echo "Usage: $0 your_project_name [--p] [--d]"
     echo "Options:"
@@ -72,8 +103,10 @@ if [ -z "$project_name" ]; then
     fi
 fi
 #*********************** source file *************************
-source "${CURRENT}/common.sh" $project_name 
-export DIR_PROJECT="$CURRENT/projects/$project_name"
+set -x
+source "${DIR_ROOT}/common.sh" $project_name 
+set +x
+export DIR_PROJECT="$DIR_ROOT/projects/$project_name"
 
 if $docker_support; then
     log_info "Docker support enabled."
@@ -98,13 +131,17 @@ if $docker_support; then
         exit 1
     fi
     #*********************** source file *************************
-    source "${GRANDFATHER}/docker.common.sh" $image_name $container_name $host_workspace $container_workspace
+    set -x
+    source "${DIR_ROOT}/docker.common.sh" $image_name $container_name $host_workspace $container_workspace
+    set +x
 fi
 
 if $python_support; then
     log_info "Python support enabled."
     #*********************** source file *************************
-    source "${GRANDFATHER}/python.common.sh"
+    set -x
+    source "${DIR_ROOT}/python.common.sh" $DIR_WORKSPACE
+    set +x
 fi
 
 log_info "-> project_name=$project_name"
@@ -130,7 +167,7 @@ else
         log_info "-> container_name=$container_name"
     fi
 
-    if [ "$host_workspace" == "$CURRENT/workspace/${project_name}" ];then
+    if [ "$host_workspace" == "$DIR_ROOT/workspace/${project_name}" ];then
         log_info "-> host_workspace=$host_workspace (default)"
     else
         log_info "-> host_workspace=$host_workspace"
@@ -148,22 +185,22 @@ fi
 setup_filesystem
 setup_project $DIR_PROJECT $project_name
 if [ ! -f "$DIR_PROJECT/start.$project_name.sh" ]; then
-    cp -r "$CURRENT/start.template" "$DIR_PROJECT/"
+    cp -r "$DIR_ROOT/start.template" "$DIR_PROJECT/"
     mv "$DIR_PROJECT/start.template" "$DIR_PROJECT/start.$project_name.sh"
     sed -i "s/template/$project_name/g" "$DIR_PROJECT/start.$project_name.sh"
     chmod +x "$DIR_PROJECT/start.$project_name.sh"
 fi
 if [ ! -f "$DIR_PROJECT/container.sh" ]; then
-    cp -r "$CURRENT/container.template" "$DIR_PROJECT/"
+    cp -r "$DIR_ROOT/container.template" "$DIR_PROJECT/"
     mv "$DIR_PROJECT/container.template" "$DIR_PROJECT/container.sh"
 fi
-if [ ! -f "$DIR_PROJECT/docker.common.sh" ]; then
-    cp -r "$CURRENT/docker.common.template" "$DIR_PROJECT/"
-    mv "$DIR_PROJECT/docker.common.template" "$DIR_PROJECT/docker.common.sh"
-fi
-if [ ! -f "$DIR_PROJECT/python.common.sh" ]; then
-    cp -r "$CURRENT/python.common.template" "$DIR_PROJECT/"
-    mv "$DIR_PROJECT/python.common.template" "$DIR_PROJECT/python.common.sh"
-fi
-log_info "Project setup complete. You can now run the project using the start script: cd $DIR_PROJECT && ./start.$project_name.sh $project_name -p -d"
-cd $DIR_PROJECT
+# if [ ! -f "$DIR_PROJECT/docker.common.sh" ]; then
+#     cp -r "$DIR_ROOT/docker.common.template" "$DIR_PROJECT/"
+#     mv "$DIR_PROJECT/docker.common.template" "$DIR_PROJECT/docker.common.sh"
+# fi
+# if [ ! -f "$DIR_PROJECT/python.common.sh" ]; then
+#     cp -r "$DIR_ROOT/python.common.template" "$DIR_PROJECT/"
+#     mv "$DIR_PROJECT/python.common.template" "$DIR_PROJECT/python.common.sh"
+# fi
+log_info "Project setup complete. You can now run the project using the start script: cd $DIR_PROJECT && ./start.$project_name.sh $DIR_ROOT $project_name -p -d"
+cd $DIR_PROJECT && ./start.$project_name.sh $DIR_ROOT $project_name -p -d

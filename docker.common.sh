@@ -4,7 +4,6 @@
 # It also includes logging functions for better traceability.
 # Usage: ./start.mem0.sh <docker_image> <docker_container>
 # Author: tomagoyaky@gmail.com
-CURRENT="$(cd $(dirname $0); pwd)"
 #################################################
 export docker_image=$1
 export docker_container=$2
@@ -100,6 +99,8 @@ docker_pull() {
 docker_run() {
     _image_name=$1
     _container_name=$2
+
+    print_parameters
 
     if [ -z "$_image_name" ] || [ -z "$_container_name" ]; then
         log_error "Image name and container name must be provided."
