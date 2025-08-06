@@ -1,35 +1,82 @@
 #!/bin/bash
 clear
-CURRENT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CURRENT="$(cd $(dirname $0); pwd)"
 FATHER="$(dirname "${CURRENT}")"
 GRANDFATHER="$(dirname "${FATHER}")"
-shell_name="templeate"
-ubuntu_image_name="ubuntu:24.04"
-ubuntu_container_name="templeate-ubuntu-24.04"
-ubuntu_host_workspace="$CURRENT/workspace/$shell_name"
-ubuntu_container_workspace="/local/data/workspace"
+project_name="$1"
+image_name="ubuntu:24.04"
+container_name="$project_name-ubuntu-24.04"
+host_workspace="$CURRENT/workspace/$project_name"
+container_workspace="/local/data/workspace"
 #################################################
-source "${GRANDFATHER}/common.sh" $shell_name
-source "${GRANDFATHER}/docker.common.sh" $ubuntu_image_name $ubuntu_container_name $ubuntu_host_workspace $ubuntu_container_workspace
-source "${GRANDFATHER}/python.common.sh"
+source "${GRANDFATHER}/common.sh" $project_name
 #################################################
+python_support=$2
+docker_support=$3
 
-# Function to pull a Docker image
-if [ ! -f $DIR_STATUS/docker.templeate.pull.status ]; then
-    docker_pull "$ubuntu_image_name"
-    echo "" > $DIR_STATUS/docker.templeate.pull.status
-else
-    log_info "Docker image '$ubuntu_image_name' already pulled."
+if [ -z "$project_name" ]; then
+    log_error "Project name is required."
+    exit 1
+fi
+if [ -z "$python_support" ]; then
+    python_support=false
+fi
+if [ -z "$docker_support" ]; then
+    docker_support=false
 fi
 
-# Function to run a Docker container
-if [ ! -f $DIR_STATUS/docker.templeate.run.status ]; then
-    docker_run "$ubuntu_image_name" "$ubuntu_container_name"
-    echo "" > $DIR_STATUS/docker.templeate.run.status
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -p)
+            python_support=true
+            shift
+            ;;
+        -d)
+            docker_support=true
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+if $docker_support; then
+    log_info "Docker support enabled."
+    #*********************** source file *************************
+    source "${GRANDFATHER}/docker.common.sh" $image_name $container_name $host_workspace $container_workspace
+
+    # Function to pull a Docker image
+    if [ ! -f $DIR_STATUS/docker.templeate.pull.status ]; then
+        docker_pull "$image_name"
+        echo "" > $DIR_STATUS/docker.templeate.pull.status
+    else
+        log_info "Docker image '$image_name' already pulled."
+    fi
 else
-    log_info "Docker container '$ubuntu_container_name' already running."
+    log_warning "Docker support not enabled."
 fi
 
-docker_copy $CURRENT/container.sh $ubuntu_container_workspace/container.sh $ubuntu_container_name
-docker_shell_cmd "$ubuntu_container_name" "mkdir -p $ubuntu_container_workspace"
-docker_shell_cmd "$ubuntu_container_name" "pwd && cd $ubuntu_container_workspace && ./container.sh"
+if $python_support; then
+    log_info "Python support enabled."
+    #*********************** source file *************************
+    source "${GRANDFATHER}/python.common.sh"
+
+    # Function to run a Docker container
+    if [ ! -f $DIR_STATUS/docker.templeate.run.status ]; then
+        docker_run "$image_name" "$container_name"
+        echo "" > $DIR_STATUS/docker.templeate.run.status
+    else
+        log_info "Docker container '$container_name' already running."
+    fi
+else
+    log_warning "Python support not enabled."
+fi
+
+if $docker_support; then
+    docker_copy $CURRENT/container.sh $container_workspace/container.sh $container_name
+    docker_shell_cmd "$container_name" "mkdir -p $container_workspace"
+    docker_shell_cmd "$container_name" "pwd && cd $container_workspace && ./container.sh"
+fi
+
+#################################################
