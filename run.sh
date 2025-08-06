@@ -147,18 +147,23 @@ fi
 # main
 setup_filesystem
 setup_project $DIR_PROJECT $project_name
-set -x
-    cp -r "$CURRENT/container.template" "$DIR_PROJECT/"
+if [ ! -f "$DIR_PROJECT/start.$project_name.sh" ]; then
     cp -r "$CURRENT/start.template" "$DIR_PROJECT/"
-    cp -r "$CURRENT/docker.common.template" "$DIR_PROJECT/"
-    cp -r "$CURRENT/python.common.template" "$DIR_PROJECT/"
     mv "$DIR_PROJECT/start.template" "$DIR_PROJECT/start.$project_name.sh"
-    mv "$DIR_PROJECT/container.template" "$DIR_PROJECT/container.sh"
-    mv "$DIR_PROJECT/docker.common.template" "$DIR_PROJECT/docker.common.sh"
-    mv "$DIR_PROJECT/python.common.template" "$DIR_PROJECT/python.common.sh"
     sed -i "s/template/$project_name/g" "$DIR_PROJECT/start.$project_name.sh"
-set +x
-
-$python_support $docker_support
+    chmod +x "$DIR_PROJECT/start.$project_name.sh"
+fi
+if [ ! -f "$DIR_PROJECT/container.sh" ]; then
+    cp -r "$CURRENT/container.template" "$DIR_PROJECT/"
+    mv "$DIR_PROJECT/container.template" "$DIR_PROJECT/container.sh"
+fi
+if [ ! -f "$DIR_PROJECT/docker.common.sh" ]; then
+    cp -r "$CURRENT/docker.common.template" "$DIR_PROJECT/"
+    mv "$DIR_PROJECT/docker.common.template" "$DIR_PROJECT/docker.common.sh"
+fi
+if [ ! -f "$DIR_PROJECT/python.common.sh" ]; then
+    cp -r "$CURRENT/python.common.template" "$DIR_PROJECT/"
+    mv "$DIR_PROJECT/python.common.template" "$DIR_PROJECT/python.common.sh"
+fi
 log_info "Project setup complete. You can now run the project using the start script: cd $DIR_PROJECT && ./start.$project_name.sh $project_name -p -d"
 cd $DIR_PROJECT
