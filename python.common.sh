@@ -1,14 +1,9 @@
 #!/bin/bash
 # desc: 
 # Author: tomagoyaky@gmail.com
-dir_workspace=$1
-dir_status="$dir_workspace/status"
-#################################################
-export dir_venv="$dir_workspace/.venv"
-#################################################
-
 venv_setup() {
-    log_info "Setting up Python virtual environment..."
+    dir_venv=$1
+    log_info "Setting up Python virtual environment at $dir_venv ..."
     if [ ! -d "$dir_venv" ]; then
         python3 -m venv "$dir_venv"
         log_info "Virtual environment created at $dir_venv."
@@ -17,6 +12,7 @@ venv_setup() {
     fi
 }
 activate_venv() {
+    dir_venv=$1
     if [ -d "$dir_venv" ]; then
         # For Unix/Linux compatibility
         if [ -f $dir_venv/bin/activate ];then
@@ -36,16 +32,3 @@ activate_venv() {
         exit 1
     fi
 }
-
-#################################################
-# Check if virtual environment is set up and activate it
-#################################################
-if [ ! -f "$dir_status/venv.ok.status" ]; then
-    venv_setup
-    touch "$dir_status/venv.ok.status"
-    log_info "Virtual environment setup complete."
-else
-    log_info "Virtual environment already set up."
-fi
-
-activate_venv

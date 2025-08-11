@@ -5,17 +5,6 @@
 # Usage: ./start.mem0.sh <docker_image> <docker_container>
 # Author: tomagoyaky@gmail.com
 #################################################
-export docker_image=$1
-export docker_container=$2
-export docker_host_workspace=$3
-export docker_container_workspace=$4
-
-print_parameters() {
-    log_info "Docker Image: $docker_image"
-    log_info "Docker Container: $docker_container"
-    log_info "Docker Host Workspace: $docker_host_workspace"
-    log_info "Docker Container Workspace: $docker_container_workspace"
-}
 usage() {
     log_error "Usage: $0 <docker_image> <docker_container>"
     exit 1
@@ -88,37 +77,39 @@ docker_pull() {
         usage
     fi
 
-    log_info "Pulling Docker image '$_image_name'..."
-    if docker pull "$_image_name"; then
-        log_info "Successfully pulled Docker image '$_image_name'."
+    log_info "Checking if Docker image '$_image_name' exists..."
+    if docker image inspect "$_image_name" >/dev/null 2>&1; then
+        log_info "Docker image '$_image_name' already exists. Skipping pull."
     else
-        log_error "Failed to pull Docker image '$_image_name'."
-        exit 1
+        log_info "Pulling Docker image '$_image_name'..."
+        if docker pull "$_image_name"; then
+            log_info "Successfully pulled Docker image '$_image_name'."
+        else
+            log_error "Failed to pull Docker image '$_image_name'."
+            exit 1
+        fi
     fi
 }
 docker_run() {
     _image_name=$1
     _container_name=$2
 
-    print_parameters
-
     if [ -z "$_image_name" ] || [ -z "$_container_name" ]; then
         log_error "Image name and container name must be provided."
         usage
     fi
 
-    log_info "Running Docker container '$_container_name' from image '$_image_name'..."
-set -x
-    docker run --name "$_container_name" \
-        -v "$docker_host_workspace:$docker_container_workspace" \
-        "$_image_name" \
-        /bin/bash -c "while true; do sleep 30; done" &
-set +x
-    if [ $? -eq 0 ]; then
-        log_info "Successfully started Docker container '$_container_name'."
+    # 如果container 不存在，则创建
+    log_info "Checking if Docker container '$_container_name' exists..."
+    if ! docker ps -a --format '{{.Names}}' | grep -q "^$_container_name$"; then
+        log_info "Docker container '$_container_name' does not exist. Creating it..."
+        docker run --name "$_container_name" \
+            -v "$docker_host_workspace:$docker_container_workspace" \
+            "$_image_name" \
+            /bin/bash -c "while true; do sleep 30; done" &
     else
-        log_error "Failed to start Docker container '$_container_name'."
-        exit 1
+        log_info "Docker container '$_container_name' already exists. Skipping creation."
+        return
     fi
 }
 docker_copy() {
@@ -210,4 +201,3 @@ docker_is_running() {
         exit 1
     fi
 }
-docker_is_running

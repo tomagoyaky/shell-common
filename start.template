@@ -1,85 +1,76 @@
 #!/bin/bash
-dir_root=$1
-dir_workspace=${dir_root}/workspace
-dir_status=${dir_workspace}/status
-project_name=$2
-image_name="ubuntu:24.04"
-container_name="$project_name-ubuntu-24.04"
-host_workspace="$dir_workspace/$project_name"
-container_workspace="/local/data/workspace"
-#################################################
-source "${dir_root}/common.sh" $project_name
-#################################################
-python_support=$2
+project_name=$1
+image_name=$2
 docker_support=$3
+python_support=$4
 
-if [ -z "$project_name" ]; then
-    log_error "Project name is required."
-    exit 1
-fi
-if [ -z "$python_support" ]; then
-    python_support=false
-fi
-if [ -z "$docker_support" ]; then
-    docker_support=false
-fi
+#*********************** set variables *************************
+container_name="${project_name}-${image_name}"
+host_workspace="$DIR_PROJECT"
+container_workspace="/local/data/workspace/$project_name"
 
-log_info "project_name=$project_name"
-log_info "python_support=$python_support"
-log_info "docker_support=$docker_support"
-log_info "image_name=$image_name"
-log_info "container_name=$container_name"
-log_info "host_workspace=$host_workspace"
-log_info "container_workspace=$container_workspace"
+#*********************** source file *************************
+source "${DIR_ROOT}/common.sh"
+source "${DIR_ROOT}/docker.common.sh"
+source "${DIR_ROOT}/python.common.sh"
 
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -p)
-            python_support=true
-            shift
-            ;;
-        -d)
-            docker_support=true
-            shift
-            ;;
-        *)
-            shift
-            ;;
-    esac
-done
+#********************* dumpping setup ************************
+log_info "#################################################"
+log_info " Project info ..."
+log_info "* Using project name: $project_name"
+log_info "* Using Docker image: $image_name"
+log_info "* Using container name: ${project_name}-${image_name}"
+log_info "* Host workspace: $host_workspace"
+log_info "* Container workspace: $container_workspace"
+log_info "* Using project name: $PROJECT_NAME"
+log_info "  - Root: $DIR_ROOT"
+log_info "  - Project: $DIR_PROJECTS"
+log_info "  - Workspace: $DIR_WORKSPACE"
+log_info "  - Status: $DIR_STATUS"
+log_info "  - Logs: $DIR_LOG"
+log_info "  - Data: $DIR_DATA"
+log_info "  - Sources: $DIR_SOURCES"
+log_info "  - Upload: $DIR_UPLOAD"
+log_info "  - Output: $DIR_OUTPUT"
+log_info "  - Tars: $DIR_TARS"
+log_info "  - Temp: $DIR_TEMP"
+log_info "#################################################"
 
 if $docker_support; then
     log_info "Docker support enabled."
     #*********************** source file *************************
-    source "${dir_root}/docker.common.sh" $image_name $container_name $host_workspace $container_workspace
-
+    
     # Function to pull a Docker image
-    if [ ! -f $dir_status/docker.$project_name.pull.status ]; then
+    if [ ! -f $DIR_STATUS/docker.$project_name.pull.status ]; then
         docker_pull "$image_name"
-        echo "" > $dir_status/docker.$project_name.pull.status
+        echo "" > $DIR_STATUS/docker.$project_name.pull.status
     else
         log_info "Docker image '$image_name' already pulled."
     fi
-fi
-
-if $python_support; then
-    log_info "Python support enabled."
-    #*********************** source file *************************
-    source "${dir_root}/python.common.sh" "$dir_workspace"
 
     # Function to run a Docker container
-    if [ ! -f $dir_status/docker.$project_name.run.status ]; then
+    if [ ! -f $DIR_STATUS/docker.$project_name.run.status ]; then
         docker_run "$image_name" "$container_name"
-        echo "" > $dir_status/docker.$project_name.run.status
+        echo "" > $DIR_STATUS/docker.$project_name.run.status
     else
         log_info "Docker container '$container_name' already running."
     fi
-fi
-
-if $docker_support; then
-    docker_copy $dir_root/container.sh $container_workspace/container.sh $container_name
+    
+    docker_is_running
+    docker_copy $DIR_ROOT/container.sh $container_workspace/container.sh $container_name
     docker_shell_cmd "$container_name" "mkdir -p $container_workspace"
     docker_shell_cmd "$container_name" "pwd && cd $container_workspace && ./container.sh"
 fi
 
-#################################################
+if $python_support; then
+    log_info "Python support enabled."
+    
+    # Function to set up Python virtual environment
+    if [ ! -f "$DIR_STATUS/venv.ok.status" ]; then
+        venv_setup
+        touch "$DIR_STATUS/venv.ok.status"
+        log_info "Virtual environment setup complete."
+    else
+        log_info "Virtual environment already set up."
+    fi
+fi

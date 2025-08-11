@@ -5,7 +5,6 @@
 log_info() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] INFO: $1"
 }
-
 log_warning() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] WARNING: $1"
 }
@@ -21,5 +20,13 @@ exist() {
     else
         log_error "Command '$1' does not exist."
         exit 1
+    fi
+}
+mkdir_if_not_exists() {
+    if [ ! -d "$1" ]; then
+        mkdir -p "$1"
+        log_info "Created directory: $1"
+    else
+        log_info "Directory already exists: $1"
     fi
 }
