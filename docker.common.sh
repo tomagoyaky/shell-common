@@ -93,6 +93,8 @@ docker_pull() {
 docker_run() {
     _image_name=$1
     _container_name=$2
+    _docker_host_workspace=$3
+    _docker_container_workspace=$4
 
     if [ -z "$_image_name" ] || [ -z "$_container_name" ]; then
         log_error "Image name and container name must be provided."
@@ -107,6 +109,10 @@ docker_run() {
             -v "$docker_host_workspace:$docker_container_workspace" \
             "$_image_name" \
             /bin/bash -c "while true; do sleep 30; done" &
+        
+
+        log_info "Waiting for container '$_container_name' to be ready ... 3s"
+        sleep 3
     else
         log_info "Docker container '$_container_name' already exists. Skipping creation."
         return
@@ -122,12 +128,11 @@ docker_copy() {
         usage
     fi
 
-    log_info "Copying files from '$_source_path' to '$_container_name:$_destination_path'..."
-set -x
-    docker cp "$_source_path" "$_container_name:$_destination_path"
-set +x
+    # log_info "Copying files from '$_source_path' to '$_container_name:$_destination_path'..."
+    docker cp "$_source_path" "$_container_name:$_destination_path" > /dev/null
+    # Check if the copy command was successful
     if [ $? -eq 0 ]; then
-        log_info "Successfully copied files to Docker container '$_container_name'."
+        log_info "Successfully copied file."
     else
         log_error "Failed to copy '$_source_path' to '$_destination_path' on Docker container '$_container_name'."
         exit 1
@@ -145,7 +150,6 @@ docker_shell() {
     if docker exec -it "$_container_name" bash; then
         log_info "Bash shell opened successfully in Docker container '$_container_name'."
     else
-        log_error "Failed to open bash shell in Docker container '$_container_name'."
         exit 1
     fi
 }
@@ -175,21 +179,21 @@ docker_is_installed() {
 }
 docker_is_running() {
     log_info "Checking if Docker is running..."
-    if [ $OSTYPE == "linux-gnu" ]; then
+    if [[ $OSTYPE =~ "linux"* ]]; then
         if systemctl is-active --quiet docker; then
             log_info "Docker is running."
         else
             log_error "Docker is not running. Please start Docker first."
             exit 1
         fi
-    elif [ $OSTYPE == "darwin"* ]; then
-        if pgrep -x "Docker" >/dev/null; then
+    elif [[ $OSTYPE =~ "darwin"* ]]; then
+        if docker info >/dev/null 2>&1; then
             log_info "Docker is running."
         else
-            log_error "Docker is not running. Please start Docker first."
+            log_error "Docker is not running. Please start Docker Desktop first."
             exit 1
         fi
-    elif [[ "$OSTYPE" == cygwin* ]] || [[ "$OSTYPE" == msys* ]] || [[ "$OSTYPE" == win32* ]]; then
+    elif [[ "$OSTYPE" =~ "cygwin"* ]] || [[ "$OSTYPE" =~ "msys"* ]] || [[ "$OSTYPE" =~ "win32"* ]]; then
         if docker info >/dev/null 2>&1; then
             log_info "Docker is running."
         else

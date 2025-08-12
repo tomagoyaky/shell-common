@@ -4,14 +4,18 @@ echo "Hello from the container!"
 
 CURRENT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export DIR_WORKSPACE="$CURRENT"
-export DIR_STATUS="$DIR_WORKSPACE/$shell_name/status"
-export DIR_LOG="$DIR_WORKSPACE/$shell_name/logs"
-export DIR_DATA="$DIR_WORKSPACE/$shell_name/data"
-export DIR_SOURCES="$DIR_WORKSPACE/$shell_name/sources"
-export DIR_UPLOAD="$DIR_WORKSPACE/$shell_name/input"
-export DIR_OUTPUT="$DIR_WORKSPACE/$shell_name/output"
-export DIR_TARS="$DIR_WORKSPACE/$shell_name/tars"
-export DIR_TEMP="$DIR_WORKSPACE/$shell_name/tmp"
+export DIR_STATUS="$DIR_WORKSPACE/status"
+export DIR_LOG="$DIR_WORKSPACE/logs"
+export DIR_DATA="$DIR_WORKSPACE/data"
+export DIR_SOURCES="$DIR_WORKSPACE/sources"
+export DIR_UPLOAD="$DIR_WORKSPACE/input"
+export DIR_OUTPUT="$DIR_WORKSPACE/output"
+export DIR_TARS="$DIR_WORKSPACE/tars"
+export DIR_TEMP="$DIR_WORKSPACE/tmp"
+
+PYTHON_VERSION="3.10.5"
+export BIN_PYTHON="/usr/bin/python310"
+export BIN_PIP="/usr/bin/pip310"
 
 FILE_APT_SOURCES="/etc/apt/sources.list.d/ubuntu.sources"
 
@@ -69,11 +73,11 @@ step0() {
 }
 
 step1() {
-    log_info "setup apt sources on tsinghua mirror..."
+    log_info "Step 1: Setup apt sources on tsinghua mirror..."
     # 从 Ubuntu 24.04 开始，Ubuntu 的软件源配置文件变更为 DEB822 格式，
     # 路径为 /etc/apt/sources.list.d/ubuntu.sources
     if [ ! -f $DIR_STATUS/container.apt.sources.ok.status ]; then
-        sudo tee $FILE_APT_SOURCES > /dev/null <<EOF
+        tee $FILE_APT_SOURCES > /dev/null <<EOF
 Types: deb
 URIs: https://mirrors.tuna.tsinghua.edu.cn/ubuntu
 Suites: noble noble-updates noble-backports
@@ -126,13 +130,18 @@ EOF
 }
 
 step2() {
-    log_info "apt update..."
+    log_info "Step 2: Update APT packages..."
     if [ ! -f $DIR_STATUS/container.apt.update.ok.status ]; then
-        sudo apt-get update
+
+        # 临时关闭https，防止证书校验失败
+        sed -i 's/https:/http:/g' $FILE_APT_SOURCES
+    
+        apt-get update
         if [ $? -ne 0 ]; then
             log_error "Failed to update APT packages."
             exit 1
         fi
+
         touch $DIR_STATUS/container.apt.update.ok.status
         log_info "apt update complete."
     else
@@ -141,38 +150,61 @@ step2() {
 }
 
 step3() {
-    log_info "Installing apt dependencies..."
+    log_info "Step 3: Installing apt dependencies..."
     if [ ! -f $DIR_STATUS/container.apt.install.ok.status ]; then
-        sudo apt-get install -y \
-            python3 \
-            python3-venv \
-            python3-pip \
-            curl \
-            git \
-            docker.io \
-            docker-compose \
-            build-essential \
-            libssl-dev \
-            libffi-dev \
-            python3-dev \
-            python3-setuptools \
-            python3-wheel \
-            python3-virtualenv
-        if [ $? -ne 0 ]; then
-            log_error "Failed to install APT dependencies."
-            exit 1
-        fi
+        apt install -y sudo \
+            build-essential zlib1g-dev libncurses5-dev libgdbm-dev \
+            libnss3-dev libssl-dev libreadline-dev libffi-dev wget git curl && \
         touch $DIR_STATUS/container.apt.install.ok.status
         log_info "Apt dependencies installed."
     else
         log_info "Apt dependencies already installed."
     fi
+
+    # 下载Python 3.7源码
+    if [ ! -f $DIR_STATUS/container.python.tar.download.ok.status ]; then
+        cd $DIR_TARS
+        log_info "Downloading Python $PYTHON_VERSION source code..."
+        curl https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tar.xz -o $DIR_TARS/Python-$PYTHON_VERSION.tar.xz
+        touch $DIR_STATUS/container.python.tar.download.ok.status
+    fi
+
+    if [ ! -f $DIR_STATUS/container.python.build.install.ok.status ]; then
+        log_info "Building and Installing Python $PYTHON_VERSION..."
+        dir_python_source=$DIR_TEMP/Python-$PYTHON_VERSION
+        dir_python_build=$dir_python_source/build
+
+        rm -rf $dir_python_source && \
+        tar -xf $DIR_TARS/Python-$PYTHON_VERSION.tar.xz -C $DIR_TEMP/
+        cd $dir_python_source
+        rm -rf $dir_python_build && \
+        mkdir -p $dir_python_build && \
+        cd $dir_python_build && \
+        $dir_python_source/configure --prefix=/usr/local/src/python310 && \
+        make clean && \
+        make -j $(nproc) > /dev/null 2>&1 && \
+        sudo make install > /dev/null 2>&1 && \
+        sudo ln -s /usr/local/src/python310/bin/python3.10 $BIN_PYTHON && \
+        sudo ln -s /usr/local/src/python310/bin/pip3 $BIN_PIP && \
+        export PATH="/usr/local/src/python310/bin:$PATH" && \
+        touch $DIR_STATUS/container.python.build.install.ok.status
+    fi
+
+    if [ ! -f $DIR_STATUS/container.python.export.path.ok.status ]; then
+        echo 'export PATH="/usr/local/src/python310/bin:$PATH"' >> ~/.bashrc && \
+        echo 'export PATH="/usr/local/src/python310/bin:$PATH"' >> ~/.bash_profile && \
+        echo 'export PATH="/usr/local/src/python310/bin:$PATH"' >> ~/.profile && \
+        echo 'export PATH="/usr/local/src/python310/bin:$PATH"' >> /etc/profile && \
+        touch $DIR_STATUS/container.python.export.path.ok.status
+    fi
 }
 
 step4() {
+    log_info "Step 4: Setting up Python virtual environment..."
     if [ ! -f $DIR_STATUS/container.python.venv.ok.status ]; then
-        log_info "Setting up Python virtual environment..."
-        python3 -m venv $CURRENT/.venv
+        cd $DIR_WORKSPACE
+        log_info "Creating Python virtual environment in $CURRENT/.venv..."
+        $BIN_PYTHON -m venv $CURRENT/.venv
         if [ $? -ne 0 ]; then
             log_error "Failed to create Python virtual environment."
             exit 1
@@ -185,16 +217,11 @@ step4() {
 }
 
 step5() {
-    log_info "Setting Python package source to Tsinghua University mirror..."
+    log_info "Step 5: Setting Python package source to Tsinghua University mirror..."
     if [ ! -f $DIR_STATUS/container.pip.source.setting.ok.status ]; then
-        pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/
+        $BIN_PIP config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/
         if [ $? -ne 0 ]; then
             log_error "Failed to set Python package source."
-            exit 1
-        fi
-        pip config set install.trusted-host pypi.tuna.tsinghua.edu.cn
-        if [ $? -ne 0 ]; then
-            log_error "Failed to set trusted host for Python package source."
             exit 1
         fi
         touch $DIR_STATUS/container.pip.source.setting.ok.status
@@ -205,14 +232,14 @@ step5() {
 }
 
 step6() {
-    log_info "Upgrade pip packages..."
-    if [ ! -f $DIR_STATUS/container.python.packages.ok.status ]; then
-        python -m pip install --upgrade pip
+    log_info "Step 6: Upgrade pip packages..."
+    if [ ! -f $DIR_STATUS/container.python.upgrade.ok.status ]; then
+        $BIN_PYTHON -m pip install --upgrade pip
         if [ $? -ne 0 ]; then
             log_error "Failed to upgrade pip."
             exit 1
         fi
-        touch $DIR_STATUS/container.python.packages.ok.status
+        touch $DIR_STATUS/container.python.upgrade.ok.status
         log_info " pip packages upgraded successfully."
     else
         log_info "pip packages upgrade already installed."
@@ -220,12 +247,12 @@ step6() {
 }
 
 step7() {
-    log_info "Installing Python packages from requirements.txt..."
+    log_info "Step 7: Installing Python packages from requirements.txt..."
     if [ ! -f $DIR_STATUS/container.python.requirements.ok.status ]; then
         if [ ! -f "$DIR_WORKSPACE/requirements.txt" ]; then
             log_warning "No requirements.txt found, skipping package installation."
         else
-            pip install -r "$DIR_WORKSPACE/requirements.txt"
+            $BIN_PIP install -r "$DIR_WORKSPACE/requirements.txt"
             if [ $? -ne 0 ]; then
                 log_error "Failed to install Python packages from requirements.txt."
                 exit 1
@@ -241,7 +268,6 @@ step7() {
 #################################################
 # default call step0 to initialize the filesystem
 #################################################
-exist sudo
 step0
 step1
 step2
